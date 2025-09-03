@@ -1,0 +1,8 @@
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+.vs/
+*.tmp
+*.log
