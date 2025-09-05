@@ -59,6 +59,13 @@ void ATDDD23Character::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 		// Looking/Aiming
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ATDDD23Character::LookInput);
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &ATDDD23Character::LookInput);
+
+		//Sprinting
+		/*EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Triggered, this, &ATDDD23Character::SprintInput);*/
+
+		//Testinput
+		EnhancedInputComponent->BindAction(TestAction, ETriggerEvent::Triggered, this, &ATDDD23Character::TestInput);
+		
 	}
 	else
 	{
@@ -86,6 +93,8 @@ void ATDDD23Character::LookInput(const FInputActionValue& Value)
 	DoAim(LookAxisVector.X, LookAxisVector.Y);
 
 }
+
+/*void ATDDD23Character::SprintInput()*/
 
 void ATDDD23Character::DoAim(float Yaw, float Pitch)
 {
@@ -117,4 +126,9 @@ void ATDDD23Character::DoJumpEnd()
 {
 	// pass StopJumping to the character
 	StopJumping();
+}
+
+void ATDDD23Character::TestInput()
+{
+	GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Red, "Pressed input action");
 }

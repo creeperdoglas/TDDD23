@@ -18,8 +18,7 @@ public class TDDD23 : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
-			"Slate",
-			"EnhancedInput"
+			"Slate"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
