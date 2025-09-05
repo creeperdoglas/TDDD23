@@ -1,14 +1,17 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "PlayerHUD.h"
+#include "TDDD23Character.h"
+#include "Kismet/GameplayStatics.h"
 
-void UPlayerHUDWidget::NativeConstruct()
+
+void UPlayerHUD::NativeConstruct()
 {
   Super::NativeConstruct();
-  Player = Cast<ACustomCharacter>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
+  Player = Cast<ATDDD23Character>(UGameplayStatics::GetPlayerCharacter(GetWorld(), 0));
 }
 
-float UPlayerHUDWidget::CalculateHealthPercentage()
+float UPlayerHUD::CalculateHealthPercentage()
 {
   if (Player)
   {

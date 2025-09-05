@@ -90,5 +90,16 @@ public:
 	/** Returns first person camera component **/
 	UCameraComponent* GetFirstPersonCameraComponent() const { return FirstPersonCameraComponent; }
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
+	float Health = 100.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
+	float MaxHealth = 100.f;
+
+	UFUNCTION(BlueprintCallable, Category = "Stats")
+	float GetHealth() const { return Health; }
+
+	UFUNCTION(BlueprintCallable, Category = "Stats")
+	float GetMaxHealth() const { return MaxHealth; }
 };
 

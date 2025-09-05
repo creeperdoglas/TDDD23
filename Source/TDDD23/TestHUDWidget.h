@@ -4,13 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "HealthBar.generated.h"
+#include "TestHUDWidget.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class TDDD23_API UHealthBar : public UUserWidget
+class TDDD23_API UTestHUDWidget : public UUserWidget
 {
 	GENERATED_BODY()
 	
