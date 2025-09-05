@@ -48,6 +48,10 @@ protected:
 	/** Mouse Look Input Action */
 	UPROPERTY(EditAnywhere, Category ="Input")
 	class UInputAction* MouseLookAction;
+
+	//Sprint input Action
+	/*UPROPERTY(EditAnywhere, Category = "Input")
+	class UInputAction* SprintAction;*/
 	
 public:
 	ATDDD23Character();
@@ -59,6 +63,10 @@ protected:
 
 	/** Called from Input Actions for looking input */
 	void LookInput(const FInputActionValue& Value);
+
+	//called from input action for sprinting input
+	/*UFUNCTION(BlueprintCallable, Category = "Input")
+	virtual void SprintInput();*/
 
 	/** Handles aim inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
@@ -75,6 +83,12 @@ protected:
 	/** Handles jump end inputs from either controls or UI interfaces */
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
+
+	//testinput
+	UPROPERTY(EditAnywhere, Category = "Input")
+	class UInputAction* TestAction;
+
+	void TestInput();
 
 protected:
 
