@@ -1,8 +1,31 @@
-Binaries/
-DerivedDataCache/
-Intermediate/
-Saved/
-Build/
+# IDE
 .vs/
-*.tmp
-*.log
+.vscode/
+.vsconfig
+
+# Engine-generated project files
+*.xcodeproj
+*.xcworkspace
+*.sln
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+
+# Binaries and builds
+Binaries/*
+Plugins/**/Binaries/*
+
+# Build (with exceptions)
+Build/*
+!Build/*/
+Build/*/**
+!Build/*/PakBlacklist*.txt
+!Build/**/*.ico
+
+# Generated data
+DerivedDataCache/*
+Intermediate/*
+Plugins/**/Intermediate/*
+Saved/*
