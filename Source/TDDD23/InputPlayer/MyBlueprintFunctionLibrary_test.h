@@ -17,6 +17,6 @@ class TDDD23_API UMyBlueprintFunctionLibrary_test : public UBlueprintFunctionLib
 protected:
 
 	//Testing if function appears in blueprint
-	UFUNCTION(BlueprintCallable, Category = "Input_Test")
+	UFUNCTION(BlueprintCallable, Category = "Input")
 	static void DoTestInput();
 };
