@@ -6,7 +6,7 @@
 #include "Blueprint/UserWidget.h"
 
 
-class ATDDD23Character;
+class AInputCharacter;
 #include "PlayerHUD.generated.h" 
 UCLASS()
 class TDDD23_API UPlayerHUD : public UUserWidget
@@ -23,5 +23,5 @@ float CalculateHealthPercentage();
 
 /** The player */
 UPROPERTY(VisibleAnywhere)
-ATDDD23Character *Player;
+AInputCharacter* Player;
 };

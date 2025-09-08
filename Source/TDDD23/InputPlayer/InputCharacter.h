@@ -28,6 +28,15 @@ public:
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
 
+	float Health = 100.f;
+
+	float MaxHealth = 100.f;
+
+	UFUNCTION(BlueprintCallable, Category = "Stats")
+	float GetHealth() const { return Health; }
+
+	UFUNCTION(BlueprintCallable, Category = "Stats")
+	float GetMaxHealth() const { return MaxHealth; }
 
 protected:
 
