@@ -55,3 +55,12 @@ void AInputCharacter::TestInput()
 	GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::Red, "Pressed input action");
 }
 
+float AInputCharacter::TakeDamage(float DamageAmount, const FDamageEvent& DamageEvent,
+	AController* EventInstigator, AActor* DamageCauser)
+{
+	const float Actual = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
+	Health = FMath::Clamp(Health - Actual, 0.f, MaxHealth);
+	BP_OnDamaged(Actual); // Let Blueprint/UI react (screen flash, sounds, etc.)
+	return Actual;
+}
+
