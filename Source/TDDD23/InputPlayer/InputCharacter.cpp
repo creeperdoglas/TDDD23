@@ -61,6 +61,10 @@ float AInputCharacter::TakeDamage(float DamageAmount, const FDamageEvent& Damage
 	const float Actual = Super::TakeDamage(DamageAmount, DamageEvent, EventInstigator, DamageCauser);
 	Health = FMath::Clamp(Health - Actual, 0.f, MaxHealth);
 	BP_OnDamaged(Actual); // Let Blueprint/UI react (screen flash, sounds, etc.)
+	if (Health <= 0.f)
+	{
+		BP_OnDeath(); 
+	}
 	return Actual;
 }
 
