@@ -42,6 +42,9 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category = "Damage")
 	void BP_OnDeath();
 
+	UFUNCTION(BlueprintImplementableEvent, Category = "Stats")
+	void BP_OnHealthChanged();
+
 	virtual float TakeDamage(float DamageAmount,
 		struct FDamageEvent const& DamageEvent,
 		class AController* EventInstigator,
