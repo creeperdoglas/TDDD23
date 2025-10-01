@@ -55,13 +55,54 @@ void AEnemyNPC::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
 
-	
-	//optionell: refresha  moveto ifall vi har en targer som inte är i attack range
+	if (!bIsDead && !TargetPlayer)
+	{
+		if (AInputCharacter* P = Cast<AInputCharacter>(UGameplayStatics::GetPlayerCharacter(this, 0)))
+		{
+			const float Aggro = AggroSphere->GetScaledSphereRadius();
+			if (FVector::DistSquared(P->GetActorLocation(), GetActorLocation()) <= Aggro * Aggro)
+			{
+				TargetPlayer = P;
+				StartChasingTarget();
+				BP_OnPlayerSpotted(P);
+			}
+		}
+	}
+	// Keep moving only while not in attack range
 	if (!bIsDead && TargetPlayer && !bInAttackRange)
 	{
 		if (AAIController* AI = Cast<AAIController>(GetController()))
 		{
-			AI->MoveToActor(TargetPlayer, AttackSphere->GetScaledSphereRadius());
+			AI->MoveToActor(TargetPlayer, 0.f); // good change
+		}
+	}
+
+	// Always evaluate attack range whenever we have a target
+	if (!bIsDead && TargetPlayer)
+	{
+		const float Range = AttackSphere->GetScaledSphereRadius();
+		const float DistSq = FVector::DistSquared(TargetPlayer->GetActorLocation(), GetActorLocation());
+		const bool InRange = DistSq <= Range * Range;
+
+		if (InRange && !bInAttackRange)
+		{
+			bInAttackRange = true;
+			if (AAIController* AI = Cast<AAIController>(GetController()))
+			{
+				AI->StopMovement();
+				AI->SetFocus(TargetPlayer);
+			}
+			StartAttack();
+		}
+		else if (!InRange && bInAttackRange)
+		{
+			bInAttackRange = false;
+			StopAttack();
+			StartChasingTarget();
+			if (AAIController* AI = Cast<AAIController>(GetController()))
+			{
+				AI->ClearFocus(EAIFocusPriority::Gameplay);
+			}
 		}
 	}
 }
@@ -77,6 +118,21 @@ void AEnemyNPC::OnAggroBegin(UPrimitiveComponent* /*Overlapped*/, AActor* Other,
 		StartChasingTarget();
 		BP_OnPlayerSpotted(Player);
 	}
+
+	/*if (!bIsDead && !TargetPlayer)
+	{
+		AInputCharacter* P = Cast<AInputCharacter>(UGameplayStatics::GetPlayerCharacter(this, 0));
+		if (P)
+		{
+			const float Aggro = AggroSphere->GetScaledSphereRadius();
+			if (FVector::DistSquared(P->GetActorLocation(), GetActorLocation()) <= Aggro * Aggro)
+			{
+				TargetPlayer = P;
+				StartChasingTarget();
+				BP_OnPlayerSpotted(P);
+			}
+		}*/
+	//}
 }
 
 void AEnemyNPC::OnAggroEnd(UPrimitiveComponent* /*Overlapped*/, AActor* Other, UPrimitiveComponent* /*OtherComp*/,
@@ -84,6 +140,7 @@ void AEnemyNPC::OnAggroEnd(UPrimitiveComponent* /*Overlapped*/, AActor* Other, U
 {
 	if (Other == TargetPlayer)
 	{
+		bInAttackRange = false;
 		StopAttack();
 		StopChasingTarget();
 		TargetPlayer = nullptr;
@@ -129,7 +186,8 @@ void AEnemyNPC::StartChasingTarget()
 	// båda är ok; använder AIController::MoveToActor här
 	if (AAIController* AI = Cast<AAIController>(GetController()))
 	{
-		AI->MoveToActor(TargetPlayer, AttackSphere->GetScaledSphereRadius());
+		//AI->MoveToActor(TargetPlayer, AttackSphere->GetScaledSphereRadius());
+		AI->MoveToActor(TargetPlayer, 0.f);
 	}
 	else
 	{
