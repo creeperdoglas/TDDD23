@@ -1,3 +1,4 @@
+Ôªø// Enemy.h
 #pragma once
 
 #include "CoreMinimal.h"
@@ -5,10 +6,13 @@
 #include "TimerManager.h"
 #include "Enemy.generated.h"
 
-
 class USphereComponent;
 class AInputCharacter;
 class AAIController;
+
+// ‚Üì forward declarations so we don‚Äôt pull animation headers here
+class UAnimMontage;
+class UAnimSequence;
 
 UCLASS()
 class TDDD23_API AEnemyNPC : public ACharacter
@@ -17,7 +21,6 @@ class TDDD23_API AEnemyNPC : public ACharacter
 
 public:
 	AEnemyNPC();
-
 	virtual void Tick(float DeltaSeconds) override;
 
 protected:
@@ -40,13 +43,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
 	float Damage = 10.f;
 
-	
-	//sekunder mellan attacker n‰r spelare ‰r i attack range (AttackSphere)
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat", meta = (ClampMin = "0.1"))
 	float AttackInterval = 1.25f;
 
-
-	//delay fˆr fˆrsta hit, gˆr det l‰tt att synca animation om jag fˆrstÂr r‰tt
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat", meta = (ClampMin = "0.0"))
 	float FirstHitDelay = 0.15f;
 
@@ -58,6 +57,53 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Category = "AI")
 	AInputCharacter* TargetPlayer = nullptr;
+
+	// ====== NEW: Animation assets (assign these exact Paragon assets in BP) ======
+	// Attacks
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Attack")
+	UAnimMontage* PrimaryAttack_RA_Montage = nullptr; // ‚ÄúPrimaryAttack_RA_Montage‚Äù
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Attack")
+	UAnimMontage* PrimaryAttack_LA_Montage = nullptr; // ‚ÄúPrimaryAttack_LA_Montage‚Äù
+
+	// Hit reacts
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Hit")
+	UAnimSequence* HitReact_Front = nullptr; // ‚ÄúHitReact_Front‚Äù
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Hit")
+	UAnimSequence* HitReact_Back = nullptr; // ‚ÄúHitReact_Back‚Äù
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Hit")
+	UAnimSequence* HitReact_Left = nullptr; // ‚ÄúHitReact_Left‚Äù
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Hit")
+	UAnimSequence* HitReact_Right = nullptr; // ‚ÄúHitReact_Right‚Äù
+
+	// Death
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Death")
+	UAnimSequence* Death_Sequence = nullptr; // ‚ÄúDeath‚Äù
+
+	// Slot used when we wrap sequences as dynamic montages
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation")
+	FName MontageSlotName = TEXT("DefaultSlot");
+
+	// ====== NEW: Patrol (optional, light) ======
+	UPROPERTY(EditInstanceOnly, Category = "AI|Patrol")
+	TArray<AActor*> PatrolPoints;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Patrol")
+	float PatrolAcceptanceRadius = 120.f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Patrol")
+	float PatrolSpeed = 220.f;
+
+	UPROPERTY(EditAnywhere, Category = "AI|Chase")
+	float ChaseSpeed = 420.f;
+
+	UPROPERTY(EditAnywhere, Category = "Mesh")
+	float MeshZOffset = -90.f;   // -90 is a good starting point for Paragon/Mannequin
+
+	// Rotate to face target even while chasing
+	UPROPERTY(EditAnywhere, Category = "AI")
+	bool bFaceTargetWhileChasing = true;
+
+	int32 CurrentPatrolIndex = 0;
 
 	// === Overlap callbacks ===
 	UFUNCTION()
@@ -81,9 +127,16 @@ protected:
 	void StopAttack();
 	void PerformAttack();
 
+	// ====== NEW: helper to pick hit-react by direction ======
+	void PlayHitReactFrom(const FVector& FromWorldPos);
+
 	// === Movement ===
 	void StartChasingTarget();
 	void StopChasingTarget();
+
+	// ====== NEW: patrol helpers ======
+	void StartPatrol();
+	void AdvancePatrolIfClose();
 
 	FTimerHandle AttackTimerHandle;
 
@@ -92,7 +145,7 @@ protected:
 		class AController* EventInstigator, AActor* DamageCauser) override;
 
 public:
-	// Helpers for Blueprints/UI ifall det behˆvs
+	// Helpers for Blueprints/UI ifall det beh√∂vs
 	UFUNCTION(BlueprintPure, Category = "Stats") float GetHealth() const { return Health; }
 	UFUNCTION(BlueprintPure, Category = "Stats") float GetMaxHealth() const { return MaxHealth; }
 	UFUNCTION(BlueprintPure, Category = "AI")    AInputCharacter* GetTarget() const { return TargetPlayer; }
@@ -100,8 +153,7 @@ public:
 
 	// Blueprint hooks (animation, VFX, SFX)
 	UFUNCTION(BlueprintImplementableEvent, Category = "Combat") void BP_OnAttack();
-	UFUNCTION(BlueprintImplementableEvent, Category = "Damage")
-	void BP_OnDamaged(float DamageReceived);
+	UFUNCTION(BlueprintImplementableEvent, Category = "Damage") void BP_OnDamaged(float DamageReceived);
 	UFUNCTION(BlueprintImplementableEvent, Category = "Damage") void BP_OnDeath();
 	UFUNCTION(BlueprintImplementableEvent, Category = "AI")     void BP_OnPlayerSpotted(AActor* NewTarget);
 	UFUNCTION(BlueprintImplementableEvent, Category = "AI")     void BP_OnPlayerLost();
