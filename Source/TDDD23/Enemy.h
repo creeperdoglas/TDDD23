@@ -99,6 +99,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "Mesh")
 	float MeshZOffset = -90.f;   // -90 is a good starting point for Paragon/Mannequin
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Mesh")
+	float MeshYawOffset = -90.f;
+
 	// Rotate to face target even while chasing
 	UPROPERTY(EditAnywhere, Category = "AI")
 	bool bFaceTargetWhileChasing = true;
@@ -144,6 +147,50 @@ protected:
 	virtual float TakeDamage(float DamageAmount, struct FDamageEvent const& DamageEvent,
 		class AController* EventInstigator, AActor* DamageCauser) override;
 
+
+	// --- Locomotion assets (is assigned in the enemy BP instance) ---
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Locomotion")
+	UAnimSequence* Idle_Sequence = nullptr;      // asset: "Idle"
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Locomotion")
+	UAnimSequence* Jog_Fwd_Sequence = nullptr;   // asset: "Jog_Fwd"   (or "Jog_Fwd_Start/Stop" if we later want starts/stops)
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Animation|Locomotion")
+	UAnimSequence* Run_Fwd_Sequence = nullptr;   // asset: "Run_Fwd"
+
+	// Use same slot as your attacks unless you prefer a different one in your AnimBP
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation|Locomotion")
+	FName LocomotionSlotName = TEXT("DefaultSlot");
+
+	// Speed thresholds (tune in BP)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation|Locomotion")
+	float WalkSpeedThreshold = 150.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation|Locomotion")
+	float RunSpeedThreshold = 350.f;
+
+	// Runtime bookkeeping
+	UAnimMontage* CurrentLocomotionMontage = nullptr;
+	UAnimSequence* CurrentLocomotionSeq = nullptr;
+
+	// Helpers
+	void EnsureLocomotion(UAnimSequence* Seq);
+	void StopLocomotion();
+	bool IsAnyAttackMontagePlaying() const;
+	// --- Facing settings (pure C++) ---
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation|Facing")
+	float FaceInterpSpeed = 8.f;          // how fast we rotate toward the target
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Animation|Facing")
+	bool bSnapYawOnAttack = true;         // snap to target at the very start of an attack
+
+	// --- Locomotion slot resolution ---
+	// If LocomotionSlotName is left as "DefaultSlot" and that slot doesn't exist in the current AnimBP,
+	// we auto-fallback to the first slot used by the attack montage, else to direct PlayAnimation.
+	FName ResolveLocomotionSlot() const;
+
+	// --- Explicit facing helper (called from Tick) ---
+	void FaceTarget(float DeltaSeconds);
 public:
 	// Helpers for Blueprints/UI ifall det behövs
 	UFUNCTION(BlueprintPure, Category = "Stats") float GetHealth() const { return Health; }

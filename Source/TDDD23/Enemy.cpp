@@ -60,12 +60,12 @@ AEnemyNPC::AEnemyNPC()
 	AggroSphere->SetHiddenInGame(true);
 	AttackSphere->SetHiddenInGame(true);
 
-	// Make the AI face the controller’s desired rotation (we’ll drive it via SetFocus)
+	// Make the AI face the controller’s desired rotation (we’ll drive it via SetFocus and FaceTarget)
 	bUseControllerRotationYaw = true;
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
 		Move->bUseControllerDesiredRotation = true;
-		Move->bOrientRotationToMovement = false;    // let focus drive facing
+		Move->bOrientRotationToMovement = false;    // let focus/manual facing drive yaw
 		Move->RotationRate = FRotator(0.f, 720.f, 0.f); // how fast it turns
 		Move->GravityScale = 1.f;                       // just to be explicit
 	}
@@ -75,13 +75,22 @@ AEnemyNPC::AEnemyNPC()
 void AEnemyNPC::BeginPlay()
 {
 	Super::BeginPlay();
-	// Nudge the mesh down so the feet touch the ground (prevents “floating” look). prev issue	
+
+	// Nudge the mesh down so the feet touch the ground (prevents “floating” look). prev issue
 	if (USkeletalMeshComponent* Skel = GetMesh())
 	{
 		FVector R = Skel->GetRelativeLocation();
 		R.Z = MeshZOffset;
 		Skel->SetRelativeLocation(R);
+
+		// NEW: yaw offset so Paragon mesh visually faces the same way as the capsule
+		FRotator RR = Skel->GetRelativeRotation();
+		RR.Yaw += MeshYawOffset;
+		Skel->SetRelativeRotation(RR);
+
+		Skel->SetAnimationMode(EAnimationMode::AnimationBlueprint);
 	}
+
 	// Start slow patrol until we see a player
 	StartPatrol();
 }
@@ -112,6 +121,8 @@ void AEnemyNPC::Tick(float DeltaSeconds)
 		{
 			AI->SetFocus(TargetPlayer);
 		}
+		// Hard guarantee we keep turning toward the player even when path following
+		FaceTarget(DeltaSeconds);
 	}
 
 	// Move while not in attack range
@@ -157,10 +168,29 @@ void AEnemyNPC::Tick(float DeltaSeconds)
 	{
 		AdvancePatrolIfClose();
 	}
+
+	// --- Drive locomotion from C++ when not attacking ---
+	if (!bIsDead)
+	{
+		const float Speed = GetVelocity().Size2D();
+
+		if (!IsAnyAttackMontagePlaying())
+		{
+			if (Speed < 10.f)
+			{
+				EnsureLocomotion(Idle_Sequence);
+			}
+			else if (Speed < RunSpeedThreshold)
+			{
+				EnsureLocomotion(Jog_Fwd_Sequence ? Jog_Fwd_Sequence : Run_Fwd_Sequence);
+			}
+			else
+			{
+				EnsureLocomotion(Run_Fwd_Sequence ? Run_Fwd_Sequence : Jog_Fwd_Sequence);
+			}
+		}
+	}
 }
-
-
-
 
 void AEnemyNPC::OnAggroBegin(UPrimitiveComponent*, AActor* Other, UPrimitiveComponent*,
 	int32, bool, const FHitResult&)
@@ -222,33 +252,6 @@ void AEnemyNPC::OnAttackEnd(UPrimitiveComponent*, AActor* Other, UPrimitiveCompo
 	}
 }
 
-//void AEnemyNPC::StartChasingTarget()
-//{
-//	if (!TargetPlayer || bIsDead) return;
-//
-//	if (UCharacterMovementComponent* Move = GetCharacterMovement())
-//	{
-//		Move->MaxWalkSpeed = ChaseSpeed; // run faster while chasing
-//	}
-//
-//	if (AAIController* AI = Cast<AAIController>(GetController()))
-//	{
-//		AI->MoveToActor(TargetPlayer, 0.f);
-//	}
-//	else
-//	{
-//		UAIBlueprintHelperLibrary::SimpleMoveToActor(GetController(), TargetPlayer);
-//	}
-//}
-//
-//void AEnemyNPC::StopChasingTarget()
-//{
-//	if (AAIController* AI = Cast<AAIController>(GetController()))
-//	{
-//		AI->StopMovement();
-//		AI->ClearFocus(EAIFocusPriority::Gameplay);
-//	}
-//}
 void AEnemyNPC::StartChasingTarget()
 {
 	if (!TargetPlayer || bIsDead) return;
@@ -275,10 +278,25 @@ void AEnemyNPC::StopChasingTarget()
 		AI->ClearFocus(EAIFocusPriority::Gameplay);
 	}
 }
+
 void AEnemyNPC::StartAttack()
 {
+	StopLocomotion();
 	if (bIsDead || !TargetPlayer) return;
 	if (GetWorldTimerManager().IsTimerActive(AttackTimerHandle)) return;
+
+	// Snap to target so the swing faces the player
+	if (bSnapYawOnAttack && TargetPlayer)
+	{
+		const FVector To = (TargetPlayer->GetActorLocation() - GetActorLocation());
+		FRotator Snap = To.Rotation();
+		Snap.Pitch = Snap.Roll = 0.f;
+		if (AAIController* AI = Cast<AAIController>(GetController()))
+		{
+			AI->SetControlRotation(Snap);
+		}
+		SetActorRotation(Snap);
+	}
 
 	// === Play one of the Paragon attack montages right away ===
 	if (UAnimInstance* Anim = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
@@ -455,5 +473,107 @@ void AEnemyNPC::AdvancePatrolIfClose()
 	}
 }
 
+bool AEnemyNPC::IsAnyAttackMontagePlaying() const
+{
+	if (const UAnimInstance* Anim = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+	{
+		if (PrimaryAttack_RA_Montage && Anim->Montage_IsPlaying(PrimaryAttack_RA_Montage)) return true;
+		if (PrimaryAttack_LA_Montage && Anim->Montage_IsPlaying(PrimaryAttack_LA_Montage)) return true;
+	}
+	return false;
+}
+
+FName AEnemyNPC::ResolveLocomotionSlot() const
+{
+	// If user set a specific slot name, try that first
+	if (LocomotionSlotName != NAME_None)
+	{
+		return LocomotionSlotName;
+	}
+
+	// Otherwise, reuse the first slot defined by our attack montages (guaranteed to exist in the ABP)
+	if (PrimaryAttack_RA_Montage && PrimaryAttack_RA_Montage->SlotAnimTracks.Num() > 0)
+	{
+		return PrimaryAttack_RA_Montage->SlotAnimTracks[0].SlotName;
+	}
+	if (PrimaryAttack_LA_Montage && PrimaryAttack_LA_Montage->SlotAnimTracks.Num() > 0)
+	{
+		return PrimaryAttack_LA_Montage->SlotAnimTracks[0].SlotName;
+	}
+
+	// Last resort
+	return FName(TEXT("DefaultSlot"));
+}
+
+void AEnemyNPC::EnsureLocomotion(UAnimSequence* Seq)
+{
+	if (!Seq || bIsDead) return;
+
+	UAnimInstance* Anim = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	if (!Anim) return;
+
+	// Don't start locomotion if an attack montage is active
+	if (IsAnyAttackMontagePlaying()) return;
+
+	// Already playing this sequence? keep it
+	if (CurrentLocomotionSeq == Seq && CurrentLocomotionMontage && Anim->Montage_IsPlaying(CurrentLocomotionMontage))
+		return;
+
+	// Stop previous locomotion montage (soft blend)
+	if (CurrentLocomotionMontage)
+	{
+		Anim->Montage_Stop(0.2f, CurrentLocomotionMontage);
+		CurrentLocomotionMontage = nullptr;
+		CurrentLocomotionSeq = nullptr;
+	}
+
+	// Use a valid slot (taken from attack montage if LocomotionSlotName is None)
+	const FName Slot = ResolveLocomotionSlot();
+
+	CurrentLocomotionMontage = Anim->PlaySlotAnimationAsDynamicMontage(
+		Seq, Slot, /*blendIn*/0.2f, /*blendOut*/0.2f, /*rate*/1.f, /*numLoops*/0 /*loop*/);
+
+	if (!CurrentLocomotionMontage)
+	{
+		// If this logs, your AnimBP is missing the slot. Add a Slot node with the same name.
+		UE_LOG(LogTemp, Warning, TEXT("EnsureLocomotion: AnimBP missing slot '%s'"), *Slot.ToString());
+		return;
+	}
+
+	CurrentLocomotionSeq = Seq;
+}
 
 
+void AEnemyNPC::StopLocomotion()
+{
+	if (UAnimInstance* Anim = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+	{
+		if (CurrentLocomotionMontage)
+		{
+			Anim->Montage_Stop(0.15f, CurrentLocomotionMontage);
+		}
+	}
+	CurrentLocomotionMontage = nullptr;
+	CurrentLocomotionSeq = nullptr;
+}
+
+void AEnemyNPC::FaceTarget(float DeltaSeconds)
+{
+	if (!TargetPlayer || bIsDead) return;
+
+	const FVector ToTarget = TargetPlayer->GetActorLocation() - GetActorLocation();
+	FRotator Desired = ToTarget.Rotation();
+	Desired.Pitch = 0.f;
+	Desired.Roll = 0.f;
+
+	if (AAIController* AI = Cast<AAIController>(GetController()))
+	{
+		const FRotator NewCR = FMath::RInterpTo(AI->GetControlRotation(), Desired, DeltaSeconds, FaceInterpSpeed);
+		AI->SetControlRotation(NewCR);
+	}
+	else
+	{
+		const FRotator NewYaw = FMath::RInterpTo(GetActorRotation(), Desired, DeltaSeconds, FaceInterpSpeed);
+		SetActorRotation(NewYaw);
+	}
+}
