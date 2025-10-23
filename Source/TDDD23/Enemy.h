@@ -191,6 +191,14 @@ protected:
 
 	// --- Explicit facing helper (called from Tick) ---
 	void FaceTarget(float DeltaSeconds);
+
+	// --- Runtime flag: when true we are temporarily using Single-Node mode for locomotion while chasing
+	bool bUsingSingleNodeLocomotion = false;
+
+	// Switch mesh animation mode at runtime (Single Node for run/jog, ABP for idle/attacks)
+	void EnterSingleNodeLocomotion(UAnimSequence* SeqToLoop);
+	void ExitSingleNodeLocomotion();
+
 public:
 	// Helpers for Blueprints/UI ifall det behövs
 	UFUNCTION(BlueprintPure, Category = "Stats") float GetHealth() const { return Health; }

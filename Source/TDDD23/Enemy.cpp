@@ -174,19 +174,32 @@ void AEnemyNPC::Tick(float DeltaSeconds)
 	{
 		const float Speed = GetVelocity().Size2D();
 
+		// If attacking, do nothing here; the attack montage is in charge.
 		if (!IsAnyAttackMontagePlaying())
 		{
-			if (Speed < 10.f)
+			if (Speed >= 10.f)
 			{
-				EnsureLocomotion(Idle_Sequence);
-			}
-			else if (Speed < RunSpeedThreshold)
-			{
-				EnsureLocomotion(Jog_Fwd_Sequence ? Jog_Fwd_Sequence : Run_Fwd_Sequence);
+				// Pick Jog vs Run sequence
+				UAnimSequence* MoveSeq = (Speed < RunSpeedThreshold)
+					? (Jog_Fwd_Sequence ? Jog_Fwd_Sequence : Run_Fwd_Sequence)
+					: (Run_Fwd_Sequence ? Run_Fwd_Sequence : Jog_Fwd_Sequence);
+
+				// Enter Single-Node locomotion if not already (or if the sequence changed)
+				if (!bUsingSingleNodeLocomotion || CurrentLocomotionSeq != MoveSeq)
+				{
+					EnterSingleNodeLocomotion(MoveSeq);
+					CurrentLocomotionSeq = MoveSeq; // reuse for change detection
+				}
 			}
 			else
 			{
-				EnsureLocomotion(Run_Fwd_Sequence ? Run_Fwd_Sequence : Jog_Fwd_Sequence);
+				// Not moving: go back to ABP so Idle shows
+				if (bUsingSingleNodeLocomotion)
+				{
+					ExitSingleNodeLocomotion();
+					CurrentLocomotionSeq = nullptr;
+				}
+				// (We don't call EnsureLocomotion(Idle_Sequence) here; ABP handles Idle.)
 			}
 		}
 	}
@@ -272,6 +285,10 @@ void AEnemyNPC::StartChasingTarget()
 
 void AEnemyNPC::StopChasingTarget()
 {
+	if (bUsingSingleNodeLocomotion)
+	{
+		ExitSingleNodeLocomotion();
+	}
 	if (AAIController* AI = Cast<AAIController>(GetController()))
 	{
 		AI->StopMovement();
@@ -281,6 +298,10 @@ void AEnemyNPC::StopChasingTarget()
 
 void AEnemyNPC::StartAttack()
 {
+	if (bUsingSingleNodeLocomotion)
+	{
+		ExitSingleNodeLocomotion();
+	}
 	StopLocomotion();
 	if (bIsDead || !TargetPlayer) return;
 	if (GetWorldTimerManager().IsTimerActive(AttackTimerHandle)) return;
@@ -485,8 +506,8 @@ bool AEnemyNPC::IsAnyAttackMontagePlaying() const
 
 FName AEnemyNPC::ResolveLocomotionSlot() const
 {
-	// If user set a specific slot name, try that first
-	if (LocomotionSlotName != NAME_None)
+	// If user set a specific slot name and it's not the placeholder "DefaultSlot", use it.
+	if (LocomotionSlotName != NAME_None && LocomotionSlotName != FName(TEXT("DefaultSlot")))
 	{
 		return LocomotionSlotName;
 	}
@@ -501,9 +522,10 @@ FName AEnemyNPC::ResolveLocomotionSlot() const
 		return PrimaryAttack_LA_Montage->SlotAnimTracks[0].SlotName;
 	}
 
-	// Last resort
-	return FName(TEXT("DefaultSlot"));
+	// Last resort ( Paragon name)
+	return FName(TEXT("FullBody"));
 }
+
 
 void AEnemyNPC::EnsureLocomotion(UAnimSequence* Seq)
 {
@@ -577,3 +599,25 @@ void AEnemyNPC::FaceTarget(float DeltaSeconds)
 		SetActorRotation(NewYaw);
 	}
 }
+void AEnemyNPC::EnterSingleNodeLocomotion(UAnimSequence* SeqToLoop)
+{
+	if (bIsDead || !SeqToLoop) return;
+	if (!GetMesh()) return;
+
+	// Switch to Single Node mode and loop the sequence
+	GetMesh()->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+	GetMesh()->PlayAnimation(SeqToLoop, /*bLoop=*/true);
+	bUsingSingleNodeLocomotion = true;
+}
+
+void AEnemyNPC::ExitSingleNodeLocomotion()
+{
+	if (!GetMesh()) return;
+
+	// Return to ABP mode so montages and normal ABP logic work (idle/attacks)
+	GetMesh()->SetAnimationMode(EAnimationMode::AnimationBlueprint);
+	// Clear any single-node playback
+	GetMesh()->Stop();
+	bUsingSingleNodeLocomotion = false;
+}
+
