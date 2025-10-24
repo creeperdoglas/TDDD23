@@ -24,4 +24,14 @@ float CalculateHealthPercentage();
 /** The player */
 UPROPERTY(VisibleAnywhere)
 AInputCharacter* Player;
+
+UFUNCTION(BlueprintPure)
+bool IsCountdownActive() const;
+
+UFUNCTION(BlueprintPure)
+float GetCountdownPercent() const;   // 0..1
+
+UFUNCTION(BlueprintPure)
+FText GetCountdownText() const;      // "MM:SS"
+
 };

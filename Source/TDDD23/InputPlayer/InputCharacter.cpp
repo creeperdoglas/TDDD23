@@ -1,10 +1,11 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "TDDD23/InputPlayer/InputCharacter.h"
 #include "InputMappingContext.h"
 #include "EnhancedInputSubsystems.h"
 #include "EnhancedInputComponent.h"
+#include "TimerManager.h" 
 
 // Sets default values
 AInputCharacter::AInputCharacter()
@@ -69,3 +70,55 @@ float AInputCharacter::TakeDamage(float DamageAmount, const FDamageEvent& Damage
 	return Actual;
 }
 
+//new
+void AInputCharacter::StartCountdown(float Duration)
+{
+    if (bCountdownActive)
+    {
+        CancelCountdown();
+    }
+
+    const float UseDuration = (Duration > 0.f) ? Duration : DefaultCountdownDuration;
+    CountdownRemaining = UseDuration;
+    bCountdownActive = true;
+
+    // tick every 0.1s for smooth UI
+    GetWorldTimerManager().SetTimer(CountdownTimerHandle, this, &AInputCharacter::CountdownTick, 0.1f, true);
+
+    // initial notify
+    BP_OnCountdownTick(CountdownRemaining);
+}
+
+void AInputCharacter::CancelCountdown()
+{
+    GetWorldTimerManager().ClearTimer(CountdownTimerHandle);
+    bCountdownActive = false;
+}
+
+void AInputCharacter::SucceedCountdown()
+{
+    if (!bCountdownActive) return;
+    GetWorldTimerManager().ClearTimer(CountdownTimerHandle);
+    bCountdownActive = false;
+    BP_OnCountdownFinished(true);
+}
+
+void AInputCharacter::CountdownTick()
+{
+    if (!bCountdownActive) return;
+
+    CountdownRemaining = FMath::Max(0.f, CountdownRemaining - 0.1f);
+    BP_OnCountdownTick(CountdownRemaining);
+
+    if (CountdownRemaining <= 0.f)
+    {
+        // Time’s up → kill player using our existing flow
+        GetWorldTimerManager().ClearTimer(CountdownTimerHandle);
+        bCountdownActive = false;
+
+        Health = 0.f;                   // update stats
+        BP_OnHealthChanged();           // refresh HUD etc
+        BP_OnDeath();                   // let BP handle ragdoll/respawn, as  in TakeDamage branch 
+        BP_OnCountdownFinished(false);  // optional UI/SFX hook
+    }
+}
