@@ -199,6 +199,13 @@ protected:
 	void EnterSingleNodeLocomotion(UAnimSequence* SeqToLoop);
 	void ExitSingleNodeLocomotion();
 
+	// Follow without NavMesh: when false, we steer directly (no pathfinding).
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+	bool bUseNavMeshForChase = false;
+
+	// Direct-chase step (no NavMesh, due to navmesh casuing issues when building) — called from Tick
+	void ManualChaseStep(float DeltaSeconds);
+
 public:
 	// Helpers for Blueprints/UI ifall det behövs
 	UFUNCTION(BlueprintPure, Category = "Stats") float GetHealth() const { return Health; }

@@ -128,9 +128,16 @@ void AEnemyNPC::Tick(float DeltaSeconds)
 	// Move while not in attack range
 	if (!bIsDead && TargetPlayer && !bInAttackRange)
 	{
-		if (AAIController* AI = Cast<AAIController>(GetController()))
+		if (bUseNavMeshForChase)
 		{
-			AI->MoveToActor(TargetPlayer, 0.f);
+			if (AAIController* AI = Cast<AAIController>(GetController()))
+			{
+				AI->MoveToActor(TargetPlayer, 0.f);
+			}
+		}
+		else
+		{
+			ManualChaseStep(DeltaSeconds); // no NavMesh: steer directly, added this due to navmesh causing crash
 		}
 	}
 
@@ -264,7 +271,6 @@ void AEnemyNPC::OnAttackEnd(UPrimitiveComponent*, AActor* Other, UPrimitiveCompo
 		}
 	}
 }
-
 void AEnemyNPC::StartChasingTarget()
 {
 	if (!TargetPlayer || bIsDead) return;
@@ -272,16 +278,32 @@ void AEnemyNPC::StartChasingTarget()
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 		Move->MaxWalkSpeed = ChaseSpeed;
 
-	if (AAIController* AI = Cast<AAIController>(GetController()))
+	if (bUseNavMeshForChase)
 	{
-		if (bFaceTargetWhileChasing) { AI->SetFocus(TargetPlayer); }
-		AI->MoveToActor(TargetPlayer, 0.f);
+		if (AAIController* AI = Cast<AAIController>(GetController()))
+		{
+			if (bFaceTargetWhileChasing) { AI->SetFocus(TargetPlayer); }
+			AI->MoveToActor(TargetPlayer, 0.f);
+		}
+		else
+		{
+			UAIBlueprintHelperLibrary::SimpleMoveToActor(GetController(), TargetPlayer);
+		}
 	}
 	else
 	{
-		UAIBlueprintHelperLibrary::SimpleMoveToActor(GetController(), TargetPlayer);
+		// Direct chase needs no immediate action — Tick() calls ManualChaseStep().
+		// Keep focus so your FaceTarget + controller yaw still turn toward player.
+		if (bFaceTargetWhileChasing)
+		{
+			if (AAIController* AI = Cast<AAIController>(GetController()))
+			{
+				AI->SetFocus(TargetPlayer);
+			}
+		}
 	}
 }
+
 
 void AEnemyNPC::StopChasingTarget()
 {
@@ -621,3 +643,13 @@ void AEnemyNPC::ExitSingleNodeLocomotion()
 	bUsingSingleNodeLocomotion = false;
 }
 
+void AEnemyNPC::ManualChaseStep(float DeltaSeconds)
+{
+	if (bIsDead || !TargetPlayer || bInAttackRange) return;
+
+	// Move straight toward the player on the X/Y plane
+	FVector To = TargetPlayer->GetActorLocation() - GetActorLocation();
+	To.Z = 0.f;
+	const FVector Dir = To.GetSafeNormal();
+	AddMovementInput(Dir, 1.f);
+}
